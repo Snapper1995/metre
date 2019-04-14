@@ -6,77 +6,146 @@ import { withTracker } from 'meteor/react-meteor-data';
 
 // @ts-ignore
 import { withStyles } from '@material-ui/core/styles';
+import { PlayArrow, Clear, Create, Refresh, PhotoCamera, FullscreenExit } from '@material-ui/icons';
 
-import { Users, Nodes } from '../../api/collections/index';
+import { Users, Ports } from '../../api/collections/index';
+
+import AppBar from '@material-ui/core/AppBar';
+import Toolbar from '@material-ui/core/Toolbar';
+import IconButton from '@material-ui/core/IconButton';
+import MenuItem from '@material-ui/core/MenuItem';
+import Select from '@material-ui/core/Select';
+
+import Camera from 'react-html5-camera-photo';
+
+import { gcode } from '../../gcode';
+
+class Drawing extends React.Component <any, any, any> {
+  componentDidMount() {
+    // @ts-ignore
+    const draw = new SVG('drawing');
+
+    // draw
+    // .size('100%', '100%')
+    // .polygon().draw();
+        
+    console.log(draw);
+
+    // draw.on('drawstart', function(e){
+    //   document.addEventListener('keydown', function(e){
+    //     if(e.keyCode == 13){
+    //       draw.draw('done');
+    //       draw.off('drawstart');
+    //     }
+    //   });
+    // });
+    
+    // draw.on('drawstop', function(){
+    //     // remove listener
+    // });
+  }
+  render() {
+    return <div
+      style={{
+        width: '100%',
+        height: '100%',
+        position: 'absolute',
+        left: 0,
+        top: 0,
+      }}
+    >
+      <img
+        src={this.props.image}
+        style={{
+          width: '100%',
+          height: '100%',
+          position: 'absolute',
+          left: 0,
+          top: 0,
+        }}
+      />
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          position: 'absolute',
+          left: 0,
+          top: 0,
+        }}
+        id="drawing"
+      ></div>
+    </div>;
+  }
+}
 
 class Component extends React.Component <any, any, any>{
   state = {
-    moving: null,
+    photoUri: null,
   };
 
-  level = (tree, depth, left, right) => {
-    const nodes = Nodes
-    .find({
-      [`in.${tree}.depth`]: depth,
-      [`in.${tree}.left`]: { $gte: left },
-      [`in.${tree}.right`]: { $lte: right },
-    });
+  takePhoto = () => this.setState({ photoUri: null });
+  savePhoto = (photoUri) => this.setState({ photoUri });
 
-    return nodes.map(node => {
-      const nin = _.get(node, 'in.nesting');
-
-      return <div
-        key={node._id}
-        style={{
-          width: `${100 / nodes.count()}%`,
-          float: 'left',
-        }}
-      >
-        <div
-          style={{ padding: 6, border: '1px solid black' }}
-        >
-          <div style={{ fontSize: 8 }}>{node._id}</div>
-          <div>
-            {nin.left}|{nin.right}
-            <span onClick={() => node.put('nesting', Nodes.insert({}))}>+</span>
-            <span onClick={() => node.pull('nesting')}>x</span>
-            <span onClick={() => this.setState({ moving: node._id })}>c</span>
-            <span onClick={() => node.move('nesting', this.state.moving)}>p</span>
-          </div>
-        </div>
-        {this.level(tree, depth + 1, nin.left, nin.right)}
-      </div>;
-    });
-  };
-
-  free = (tree) => {
-    return Nodes.find({ [`in.${tree}`]: { $exists: false } })
-    .map((node) => {
-      return <div
-        key={node._id}
-        style={{ padding: 6, border: '1px solid black', float: 'left' }}
-      >
-        <div style={{ fontSize: 8 }}>{node._id}</div>
-      </div>;
-    });
-  };
+  refresh = () => Meteor.call('grbl', 'G90 G0 X0 Y0 Z0');
+  center = () => Meteor.call('grbl', 'G90 G0 X25 Y25 Z0');
+  play = () => Meteor.call('grbl', gcode);
 
   render() {
+    const { ports } = this.props;
+
+    const activated = Ports.findOne({ active: true });
+    const active = (activated && activated._id) || '';
+
     return <div>
-      {this.level('nesting', 0, 0, 999999999999999)}
-      <br/><hr/><br/>
-      {this.free('nesting')}
+      <AppBar style={{ background: 'white' }}>
+        <Toolbar>
+          <Select
+            style={{ minWidth: 150 }}
+            value={active}
+            onChange={(event) => Ports.update(event.target.value, { $set: { active: true } })}
+          >
+            {ports.map(port => {
+              return <MenuItem
+                key={port._id}
+                value={port._id}
+              >
+                {port.port}
+              </MenuItem>;
+            })}
+          </Select>
+          <IconButton onClick={this.takePhoto}>
+            <PhotoCamera/>
+          </IconButton>
+          <IconButton onClick={this.refresh}>
+            <Refresh/>
+          </IconButton>
+          <IconButton onClick={this.center}>
+            <FullscreenExit/>
+          </IconButton>
+          <IconButton>
+            <Create/>
+          </IconButton>
+          <IconButton>
+            <Clear/>
+          </IconButton>
+          <IconButton onClick={this.play}>
+            <PlayArrow/>
+          </IconButton>
+        </Toolbar>
+      </AppBar>
+      {Meteor.isClient && (this.state.photoUri
+        ? <Drawing image={this.state.photoUri}/>
+        : <Camera onTakePhoto = {(photoUri) => this.savePhoto(photoUri)}/>
+      )}
     </div>;
   }
 }
 
 const tracked = withTracker((props) => {
-  const users = Users.find();
-  const nodes = Nodes.find();
+  const ports = Ports.find({});
   return {
-    users: users.fetch(),
-    nodes: nodes.fetch(),
     ...props,
+    ports: ports.fetch(),
   };
 })((props: any) => <Component {...props}/>);
 

@@ -4,14 +4,13 @@ Install:
 
 - https://git-scm.com/
 - https://www.meteor.com
-- https://bit.dev
 - https://nodejs.org
 
 Then:
 
 ```
-git clone git@github.com:ivansglazunov/metre.git metre
-cd metre
+git clone https://github.com/Snapper1995/metre.git cherenkovatel
+cd cherenkovatel
 meteor npm i
 meteor run
 ```
