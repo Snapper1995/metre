@@ -8,6 +8,7 @@ import theme from '../imports/react/theme';
 import { client } from '../imports/api/client';
 
 import 'react-html5-camera-photo/build/css/index.css';
+import "react-image-crop/dist/ReactCrop.css";
 import 'normalize.css';
 
 Meteor.startup(() => {

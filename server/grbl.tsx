@@ -5,11 +5,13 @@ import { reinit } from '../imports/api/grbl';
 import PortSocket from 'cncjs-pendant-boilerplate';
 
 let gcodes = [];
-const gcoderun = () => {
+export const gcoderun = () => {
+  if (!socket) throw new Error('Cant gcoderun because broken socket');
   if (gcodes.length) {
     const port = Ports.findOne({ active: true });
     if (port) {
-      const gcode = gcodes.pop();
+      const gcode = gcodes.shift();
+      console.log('gcode', gcode);
       socket.emit('write', port.port, gcode + '\n');
     }
   }
@@ -31,6 +33,7 @@ Meteor.methods({
 export let socket;
 
 const resocket = (doc) => {
+  console.log('resocket start', doc);
   PortSocket({
     secret: undefined,
     port: doc.port,
@@ -40,7 +43,9 @@ const resocket = (doc) => {
     controllerType: 'Grbl',
     accessTokenLifetime: '30d',
   }, Meteor.bindEnvironment((error, _socket) => {
+    if (error) throw error;
     socket = _socket;
+    console.log('resocket done');
     socket.on('serialport:read', Meteor.bindEnvironment(function(data) {
       const isOk = (data || '').trim() === 'ok';
       if (isOk) gcoderun();

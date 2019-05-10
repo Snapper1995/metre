@@ -6,7 +6,7 @@ import { withTracker } from 'meteor/react-meteor-data';
 
 // @ts-ignore
 import { withStyles } from '@material-ui/core/styles';
-import { PlayArrow, Clear, Create, Refresh, PhotoCamera, FullscreenExit } from '@material-ui/icons';
+import { PlayArrow, Clear, Create, ChevronLeft, Refresh, PhotoCamera, FullscreenExit } from '@material-ui/icons';
 
 import { Users, Ports } from '../../api/collections/index';
 
@@ -14,87 +14,114 @@ import AppBar from '@material-ui/core/AppBar';
 import Toolbar from '@material-ui/core/Toolbar';
 import IconButton from '@material-ui/core/IconButton';
 import MenuItem from '@material-ui/core/MenuItem';
+import TextField from '@material-ui/core/TextField';
 import Select from '@material-ui/core/Select';
 
 import Camera from 'react-html5-camera-photo';
+import svgcode from 'svgcode';
 
-import { gcode } from '../../gcode';
-
-class Drawing extends React.Component <any, any, any> {
-  componentDidMount() {
-    // @ts-ignore
-    const draw = new SVG('drawing');
-
-    // draw
-    // .size('100%', '100%')
-    // .polygon().draw();
-        
-    console.log(draw);
-
-    // draw.on('drawstart', function(e){
-    //   document.addEventListener('keydown', function(e){
-    //     if(e.keyCode == 13){
-    //       draw.draw('done');
-    //       draw.off('drawstart');
-    //     }
-    //   });
-    // });
-    
-    // draw.on('drawstop', function(){
-    //     // remove listener
-    // });
-  }
-  render() {
-    return <div
-      style={{
-        width: '100%',
-        height: '100%',
-        position: 'absolute',
-        left: 0,
-        top: 0,
-      }}
-    >
-      <img
-        src={this.props.image}
-        style={{
-          width: '100%',
-          height: '100%',
-          position: 'absolute',
-          left: 0,
-          top: 0,
-        }}
-      />
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          position: 'absolute',
-          left: 0,
-          top: 0,
-        }}
-        id="drawing"
-      ></div>
-    </div>;
-  }
-}
+import { DrawCanvas } from '../components/draw';
+import { Cropper } from '../components/cropper';
 
 class Component extends React.Component <any, any, any>{
   state = {
-    photoUri: null,
+    croppedPhoto: null,
+    originPhoto: null,
+    width: 0,
+    height: 0,
+    paths: [ [] ],
+    minX: 21.5,
+    minY: 36.5,
+    maxX: 57,
+    maxY: 57,
+    wH: typeof(window) === 'object' ? window.innerHeight - 64 : 0,
+    wW: typeof(window) === 'object' ? window.innerWidth : 0,
   };
 
-  takePhoto = () => this.setState({ photoUri: null });
-  savePhoto = (photoUri) => this.setState({ photoUri });
+  takePhoto = () => this.setState({ croppedPhoto: null, originPhoto: null });
+  savePhoto = (key, photo) => {
+    var img = new Image()
+    img.onload = () => {
+      this.setState({ [key]: photo, width: img.width, height: img.height });
+    };
+    img.src = photo;
+  };
 
+  calc = (from, to, value) => {
+    var fromOne = (from / 100);
+    var toOne = (to / 100);
+    return (value / fromOne) * toOne;
+  };
+
+  clear = () => this.setState({ paths: [ [] ] });
   refresh = () => Meteor.call('grbl', 'G90 G0 X0 Y0 Z0');
   center = () => Meteor.call('grbl', 'G90 G0 X25 Y25 Z0');
-  play = () => Meteor.call('grbl', gcode);
+  min = () => Meteor.call('grbl', `G90 G0 X${this.state.minX} Y${this.state.minY} Z0`);
+  max = () => Meteor.call('grbl', `G90 G0 X${this.state.maxX} Y${this.state.maxY} Z0`);
+  play = () => {
+    const { minX, minY, maxX, maxY, wH, wW } = this.state;
+
+    const aW = maxX - minX;
+    const aH = maxY - minY;
+
+    const paths = this.state.paths.map(_points => {
+      let path = '';
+      let points = _points.slice(0);
+      if (points.length > 0) {
+        path = `M ${this.calc(wW, aW, points[0].x) + minX} ${this.calc(wH, aH, points[0].y) + minY}`;
+        var p1, p2, end;
+        for (var i = 1; i < points.length - 2; i += 2) {
+          p1 = points[i];
+          p2 = points[i + 1];
+          end = points[i + 2];
+          path += ` C ${this.calc(wW, aW, p1.x) + minX} ${this.calc(wH, aH, p1.y) + minY}, ${this.calc(wW, aW, p2.x) + minX} ${this.calc(wH, aH, p2.y) + minY}, ${this.calc(wW, aW, end.x) + minX} ${this.calc(wH, aH, end.y) + minY}`;
+        }
+      }
+      return path;
+    }).filter(p => p !== '');
+    
+    const svgPaths = paths.map(path => {
+      return `<path
+        stroke="black"
+        strokeWidth="2"
+        d="${path}"
+        fill="none"
+      />`;
+    }).join('');
+
+    const svg = `<svg>${svgPaths}</svg>`;
+
+    console.log(svg);
+    
+    const gc = svgcode();
+    gc.svgFile = svg;
+
+    const agc = gc
+    .generateGcode()
+    .getGcode();
+
+    agc.splice(3, 1);
+    agc.splice(agc.length - 1, 1);
+    agc.push(`G0 X0 Y0`);
+    let sgc = agc.join('\n');
+    sgc = sgc.replace(/ Z-10/g, '');
+    sgc = sgc.replace(/G1/g, 'G0');
+
+    console.log(sgc);
+    Meteor.call('grbl', sgc);
+  }
+
+  onChange = (paths) => this.setState({ paths });
 
   render() {
     const { ports } = this.props;
+    const { minX, minY, maxX, maxY, wH, wW } = this.state;
 
     const activated = Ports.findOne({ active: true });
     const active = (activated && activated._id) || '';
+
+    const aW = maxX - minX;
+    const aH = maxY - minY;
 
     return <div>
       <AppBar style={{ background: 'white' }}>
@@ -122,21 +149,77 @@ class Component extends React.Component <any, any, any>{
           <IconButton onClick={this.center}>
             <FullscreenExit/>
           </IconButton>
+          <IconButton onClick={this.min}>
+            <ChevronLeft style={{ transform: 'rotate(45deg)' }}/>
+          </IconButton>
+          <IconButton onClick={this.max}>
+            <ChevronLeft style={{ transform: 'rotate(225deg)' }}/>
+          </IconButton>
           <IconButton>
             <Create/>
           </IconButton>
-          <IconButton>
+          <IconButton onClick={this.clear}>
             <Clear/>
           </IconButton>
           <IconButton onClick={this.play}>
             <PlayArrow/>
           </IconButton>
+          <TextField
+            label='maxX'
+            value={this.state.maxX}
+            type="number"
+            style={{ width: 50 }}
+            onChange={e => this.setState({ maxX: e.target.value })}
+          />
+          <TextField
+            label='maxY'
+            value={this.state.maxY}
+            type="number"
+            style={{ width: 50 }}
+            onChange={e => this.setState({ maxY: e.target.value })}
+          />
+          <TextField
+            label='minX'
+            value={this.state.minX}
+            type="number"
+            style={{ width: 50 }}
+            onChange={e => this.setState({ minX: e.target.value })}
+          />
+          <TextField
+            label='minY'
+            value={this.state.minY}
+            type="number"
+            style={{ width: 50 }}
+            onChange={e => this.setState({ minY: e.target.value })}
+          />
         </Toolbar>
       </AppBar>
-      {Meteor.isClient && (this.state.photoUri
-        ? <Drawing image={this.state.photoUri}/>
-        : <Camera onTakePhoto = {(photoUri) => this.savePhoto(photoUri)}/>
-      )}
+      <div style={{ position: 'absolute', top: 64, left: 0, height: 'calc(100% - 64px)', width: '100%' }}>
+        {Meteor.isClient && (this.state.croppedPhoto
+          ? <React.Fragment>
+            <DrawCanvas
+              paths={this.state.paths}
+              onChange={this.onChange}
+              image={this.state.croppedPhoto}
+              width={wW}
+              height={wH}
+              style={{ position: 'absolute', top: `calc(50% - ${wH / 2}px)`, left: `calc(50% - ${wW / 2}px)` }}
+            />
+            <div style={{
+              pointerEvents: 'none',
+              position: 'absolute',
+              left: `calc(50% - ${wW / 2}px)`,
+              top: `calc(50% - ${wH / 2}px)`,
+              width: wW,
+              height: wH,
+              boxShadow: `0 0 0 2px black`,
+            }}></div>
+          </React.Fragment>
+          : this.state.originPhoto
+          ? <Cropper src={this.state.originPhoto} onCropped={(photo) => this.savePhoto('croppedPhoto', photo)}/>
+          : <Camera onTakePhoto = {(photo) => this.savePhoto('originPhoto', photo)}/>
+        )}
+      </div>
     </div>;
   }
 }
