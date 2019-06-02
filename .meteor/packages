@@ -27,3 +27,5 @@ underscore
 random
 matb33:collection-hooks
 dburles:collection-helpers
+omega:meteor-desktop-watcher@=2.0.0
+omega:meteor-desktop-bundler@=2.0.0

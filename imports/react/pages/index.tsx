@@ -96,16 +96,19 @@ class Component extends React.Component <any, any, any>{
     const gc = svgcode();
     gc.svgFile = svg;
 
-    const agc = gc
-    .generateGcode()
-    .getGcode();
+    const agc = [
+      `G1 F300`,
+      ...gc
+      .generateGcode()
+      .getGcode(),
+    ];
 
     agc.splice(3, 1);
     agc.splice(agc.length - 1, 1);
     agc.push(`G0 X0 Y0`);
     let sgc = agc.join('\n');
     sgc = sgc.replace(/ Z-10/g, '');
-    sgc = sgc.replace(/G1/g, 'G0');
+    // sgc = sgc.replace(/G1/g, 'G0');
 
     console.log(sgc);
     Meteor.call('grbl', sgc);

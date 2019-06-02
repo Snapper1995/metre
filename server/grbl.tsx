@@ -33,6 +33,7 @@ Meteor.methods({
 export let socket;
 
 const resocket = (doc) => {
+  if (!doc) return console.log('resocket doc not founded');
   console.log('resocket start', doc);
   PortSocket({
     secret: undefined,

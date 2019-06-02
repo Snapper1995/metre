@@ -5,7 +5,8 @@
   "scripts": {
     "start": "npm-run-all --parallel meteor cncjs",
     "meteor": "meteor run",
-    "cncjs": "sudo cncjs"
+    "cncjs": "sudo cncjs",
+    "desktop": "meteor-desktop"
   },
   "dependencies": {
     "@babel/runtime": "^7.4.3",
@@ -14,9 +15,11 @@
     "@svgdotjs/svg.js": "^3.0.12",
     "async": "^2.6.2",
     "bcrypt": "^3.0.5",
+    "canvg": "^1.5.3",
     "cncjs-pendant-boilerplate": "github:cncjs/cncjs-pendant-boilerplate",
     "create-react-class": "^15.6.3",
     "i18n": "^0.8.3",
+    "jsdom": "^15.1.1",
     "jss": "^9.8.7",
     "lodash": "^4.17.11",
     "meteor-node-stubs": "^0.4.1",
@@ -49,7 +52,8 @@
     "svgcode": "^1.0.1",
     "tslint-config-evolvator": "0.0.0",
     "uniforms": "^1.31.1",
-    "uniforms-material": "^1.31.1"
+    "uniforms-material": "^1.31.1",
+    "xmldom": "^0.1.27"
   },
   "devDependencies": {
     "@babel/plugin-proposal-class-properties": "^7.4.0",
@@ -63,6 +67,9 @@
     "@types/react-router": "^4.4.5",
     "@types/react-router-dom": "^4.3.1",
     "cncjs": "^1.9.20",
+    "electron": "2.0.10",
+    "electron-builder": "20.28.4",
+    "meteor-desktop": "^2.0.0",
     "npm-run-all": "^4.1.5",
     "tslint": "^5.15.0",
     "tslint-config-airbnb": "^5.11.1",
